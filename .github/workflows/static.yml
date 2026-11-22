@@ -1,0 +1,24 @@
+name: static-site
+on:
+  pull_request:
+  push: { branches: [main] }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: landing page exists and is self-contained
+        run: |
+          test -f index.html
+          # zero-framework law: no script tags loading remote or local JS
+          ! grep -qiE '<script' index.html
+          # no build artifacts, no dependencies
+          test ! -d node_modules
+          test ! -f package.json
+      - name: no secret-shaped strings tracked
+        run: |
+          ! grep -rniE 'vck_[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|MNEMONIC|PRIVATE KEY' index.html references README.md
+      - name: content sanity (real anchors present)
+        run: |
+          grep -q '0xd0cc3595679a36b64c860568217b623605980e6a' index.html
+          grep -qi 'testnet' index.html
