@@ -4,9 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TandaBill — programmable trade settlement on World Chain</title>
-<meta name="description" content="TandaBill puts bilateral trade settlement into a smart contract: seats, escrow, and proof-of-payment on World Chain. Currently live on Sepolia testnet.">
+<meta name="description" content="TandaBill puts bilateral trade settlement into a smart contract: seats, escrow, confirmations, and pull-claim payouts on World Chain. Currently live on Sepolia testnet.">
+<meta property="og:title" content="TandaBill — programmable trade settlement on World Chain">
+<meta property="og:description" content="Escrow, seats, and proof-of-payment as a contract. Live on World Chain Sepolia, built in the open.">
+<meta property="og:type" content="website">
 <style>
-  :root{--ink:#101418;--paper:#f7f5f0;--accent:#0a6cff;--muted:#5b6470;--line:#e3dfd6}
+  :root{--ink:#101418;--paper:#f7f5f0;--accent:#0a6cff;--muted:#5b6470;--line:#e3dfd6;--card:#ffffff}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font:17px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper)}
   main{max-width:46rem;margin:0 auto;padding:0 1.4rem}
@@ -14,15 +17,19 @@
   section:last-of-type{border-bottom:none}
   h1{font-size:clamp(2rem,6vw,3.1rem);line-height:1.12;letter-spacing:-.02em}
   h2{font-size:1.35rem;margin-bottom:1.1rem;letter-spacing:-.01em}
+  h3{font-size:1.02rem;margin-bottom:.3rem}
   p.lead{font-size:1.18rem;color:var(--muted);margin-top:1.1rem;max-width:38rem}
-  ol{list-style:none;counter-reset:step}
-  ol li{counter-increment:step;padding:.9rem 0 .9rem 3rem;position:relative;border-bottom:1px dashed var(--line)}
-  ol li:last-child{border-bottom:none}
-  ol li::before{content:counter(step,decimal-leading-zero);position:absolute;left:0;top:.95rem;color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums}
-  ol li b{display:block}
+  ol.steps{list-style:none;counter-reset:step}
+  ol.steps li{counter-increment:step;padding:.9rem 0 .9rem 3rem;position:relative;border-bottom:1px dashed var(--line)}
+  ol.steps li:last-child{border-bottom:none}
+  ol.steps li::before{content:counter(step,decimal-leading-zero);position:absolute;left:0;top:.95rem;color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums}
+  ol.steps li b{display:block}
   code{background:#ecebe4;padding:.1em .35em;border-radius:4px;font-size:.9em;word-break:break-all}
-  .status{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.2rem 1.4rem;margin-top:1.2rem}
-  .status p{margin:.35rem 0}
+  .status,.mech{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem 1.4rem;margin-top:1.2rem}
+  .status p,.mech p{margin:.35rem 0}
+  .grid{display:grid;grid-template-columns:1fr;gap:1rem;margin-top:1.2rem}
+  @media(min-width:640px){.grid{grid-template-columns:1fr 1fr}}
+  .grid .mech{margin-top:0}
   .tag{display:inline-block;font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
   a{color:var(--accent);text-decoration:none}
   a:hover{text-decoration:underline}
@@ -48,28 +55,50 @@
 
 <section>
   <h2>How a TandaBill settles</h2>
-  <ol>
+  <ol class="steps">
     <li><b>Create the bill</b> Invited seats join a contract — payer and payees, each with a World-verified wallet.</li>
     <li><b>Escrow funds</b> Payment locks into the contract (USDC on World Chain), releasable only by the agreed settlement terms.</li>
     <li><b>Record the work</b> Expenses and delivery events attach to the same bill — one ledger, both sides see it.</li>
-    <li><b>Confirm &amp; execute</b> Every seat confirms the settlement state; the contract computes payouts and releases them.</li>
-    <li><b>Claim with proof</b> Each payee pulls their payout; the on-chain event is the receipt nobody can argue with.</li>
+    <li><b>Confirm &amp; execute</b> Every seat confirms the settlement state; only then does the contract release funds.</li>
+    <li><b>Claim with proof</b> Each payee <em>pulls</em> their payout; the on-chain event is the receipt nobody can argue with.</li>
   </ol>
+</section>
+
+<section>
+  <h2>The mechanics that make it safe</h2>
+  <div class="grid">
+    <div class="mech">
+      <h3>Checks-effects-interactions</h3>
+      <p>Payout state is committed <em>before</em> any token transfer, so a malicious or reverting token hook can never re-enter and double-pay. Proven by golden re-entrancy tests, not asserted by comment.</p>
+    </div>
+    <div class="mech">
+      <h3>Pull-based claims</h3>
+      <p>Execute computes payouts; each seat claims its own. A failed claim stays retryable — no silent stranding of a payee's funds.</p>
+    </div>
+    <div class="mech">
+      <h3>Hard settlement windows</h3>
+      <p>Confirmation runs on a bounded window (1&nbsp;h production pace); if a roster never confirms, <code>refundSettlement</code> releases escrow back after the max-hold — money can't sit frozen forever.</p>
+    </div>
+    <div class="mech">
+      <h3>Adversarial-token hardened</h3>
+      <p>USDT-style tokens that return nothing on success won't revert; tokens that lie with <code>false</code> surface as typed errors. Both behaviors are pinned by tests against hostile token doubles.</p>
+    </div>
+  </div>
 </section>
 
 <section>
   <h2>What is true today</h2>
   <div class="status">
     <p><b>Testnet, verified, audited-by-adversary.</b> TandaBillV2 + factory run on World Chain Sepolia (chain id 4801), source-verified on the block explorer.</p>
-    <p><b>Hardened.</b> SafeERC20 payment legs and checks-effects-interactions ordering, closed out with golden re-entrancy tests contributed through adversarial review.</p>
-    <p><b>Proven end-to-end.</b> Full lifecycle — create → seat → expense → fund → settle → confirm → execute → claim — replayed as a 41-assertion on-chain loop proof.</p>
+    <p><b>Proven end-to-end.</b> Full lifecycle — create → seat → expense → fund → settle → confirm → execute → claim — replayed as a 41-assertion on-chain loop proof against the live contracts and indexer.</p>
+    <p><b>Mini-app in construction.</b> A World App mini-app (seat invites, verify-proof grants, settlement views) is being built on the same contract set; its hosted launch will be linked here the day it deploys green.</p>
     <p>Impl <code>0xd0cc3595679a36b64c860568217b623605980e6a</code> · Factory <code>0x010872d47bd7bb001037577a15d090556bfd24c3</code> · <a href="https://sepolia.worldscan.org">worldscan</a></p>
   </div>
 </section>
 
 <section>
   <h2>Built by a small swarm, in the open</h2>
-  <p>Contracts, indexer, mini-app and proofs live in the public <a href="https://github.com/FluxNimbusAi">FluxNimbusAi</a> organization. Every decision leaves a trail: pull requests, test receipts, and review verdicts. Come look.</p>
+  <p>Contracts, indexer, mini-app and proofs live in the public <a href="https://github.com/FluxNimbusAi">FluxNimbusAi</a> organization. Every decision leaves a trail: pull requests with CI, adversarial review cards, re-entrancy goldens, and deploy receipts whose hashes anyone can recompute. Come look — the history <em>is</em> the product.</p>
   <a class="cta" href="https://github.com/FluxNimbusAi/tanda">github.com/FluxNimbusAi/tanda →</a>
 </section>
 
