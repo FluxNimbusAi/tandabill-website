@@ -1,6 +1,6 @@
 # tandabill.world — landing site for TandaBill
 
-Static, zero-framework landing page for [TandaBill](https://github.com/FluxNimbusAi/tanda): programmable trade settlement on World Chain.
+Static, zero-framework landing page for [TandaBill](https://github.com/FluxNimbusAi/tanda): escrowed settlement between verified humans on World Chain.
 
 ## Rules of this repo (pre-ruled 2026-11-22)
 - Plain HTML/CSS, no JS, no fonts/assets loaded remotely. Single file: `index.html`.
